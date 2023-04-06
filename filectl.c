@@ -8,7 +8,41 @@
 
 static int major = 0; //确定主设备号，0默认系统分配
 static struct class *filectl_class;
-static char kbuffer[1024]; //内核空间的buffer
+unsigned char kbuffer[1024]; // 内核空间的buffer
+unsigned char ubuffer[1024]; // 申请一段空间用于存放用户数据
+
+/*
+  * FILECTL_READ 是和测试传递的参数是一样的才能匹配上 
+  * FILECTL_WRITE 同样如此
+  */
+
+#define FILECTL_READ       _IOR('c', 0, unsigned int)   //对文件进行读取
+#define FILECTL_WRITE      _IOW('c', 0, unsigned int)   //对文件进行写入
+
+
+static long filectl_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+    int ret;
+	printk("[%s %d]1111\n", __FUNCTION__, __LINE__);
+
+	switch(cmd) {
+		case FILECTL_READ:
+            ret = copy_to_user((void __user *)arg, ubuffer, sizeof(ubuffer)); // 将内核空间的buffer拷贝至用户空间
+            if(ret < 0) {
+                printk("[%s %d]copy_to_user error\n ",__FUNCTION__, __LINE__);
+			}
+			printk("[%s %s %d]\n", __FILE__, __func__, __LINE__);
+			break;
+		case FILECTL_WRITE:
+            ret = copy_from_user(ubuffer, (void __user *)arg, sizeof(ubuffer)); 
+            if(ret < 0) {
+                printk("[%s %d]copy_from_user error \n ",__FUNCTION__, __LINE__);
+            }
+			printk("[%s %s %d]\n", __FILE__, __func__, __LINE__);
+			break;
+	}
+    return 0;
+}
 
 ssize_t filectl_read(struct file *file, char __user *buf, size_t size, loff_t *pops)
 {
@@ -18,6 +52,7 @@ ssize_t filectl_read(struct file *file, char __user *buf, size_t size, loff_t *p
     if(ret < 0) {
         printk("[%s %d]copy_to_user error \n ",__FUNCTION__, __LINE__ );
     }
+	printk("[%s %s %d]\n", __FILE__, __func__, __LINE__);
     return size;
 }
 
@@ -44,14 +79,14 @@ int filectl_close(struct inode *inode, struct file *file)
     return 0;
 }
 
-
 // 定义自己的驱动的 file_operations
 static struct file_operations filectl_ops = {
     .owner	 = THIS_MODULE,
     .read    = filectl_read,
     .write   = filectl_write,
     .open    = filectl_open,
-	.release = filectl_close, // 好像没有close这个函数
+    .release = filectl_close, // 好像没有close这个函数
+    .unlocked_ioctl = filectl_ioctl, //添加ioclt操作函数
 };
 
 static int __init filectl_init(void)
