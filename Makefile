@@ -7,6 +7,7 @@ obj-m += hello.o
 obj-m += hello_world.o
 obj-m += filectl.o
 obj-m += private_data.o
+obj-y += platform_driver/
 
 all:
 	make	-C $(KERN_DIR) M=$(PWD) modules
